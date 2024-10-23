@@ -3,7 +3,7 @@
 Notes:
     This is developed with rdkit-Release_2021_09_4.
 """
-from enum import Enum
+
 import argparse
 import glob
 import logging
@@ -15,6 +15,7 @@ import subprocess
 import sys
 import typing
 import xml.etree.ElementTree as ET
+from enum import Enum
 from os import PathLike
 from pathlib import Path
 from subprocess import PIPE
@@ -47,17 +48,19 @@ SupportedSystem = Literal["win", "linux"]
 
 here = Path(__file__).parent.resolve()
 
+
 class LangType(Enum):
     CPlusPlus = 1
     Java = 2
     CSharp = 3
     Python = 4
 
-_LangType_to_str: Mapping[LangType, str]  ={
+
+_LangType_to_str: Mapping[LangType, str] = {
     LangType.CPlusPlus: "cpp",
     LangType.Java: "java",
     LangType.CSharp: "CSharp",
-    LangType.Python : "python",
+    LangType.Python: "python",
 }
 
 
@@ -91,7 +94,7 @@ _platform_to_address_model: Mapping[CpuModel, AddressModel] = {
 _vs_to_msvc_internal_ver: Mapping[VisualStudioVersion, MSVCInternalVersion] = {
     "15.0": "14.1",
     "16.0": "14.2",
-    "17.0": "14.3"
+    "17.0": "14.3",
 }
 
 
@@ -212,6 +215,7 @@ def remove_if_exist(path: Path) -> None:
         elif path.is_dir():
             shutil.rmtree(path)
 
+
 def remove_by_pattern(parent: Path, re_pattern: str, delete_on_match: bool) -> None:
     pat = re.compile(re_pattern)
     for p in parent.iterdir():
@@ -221,6 +225,7 @@ def remove_by_pattern(parent: Path, re_pattern: str, delete_on_match: bool) -> N
         else:
             if not pat.match(p.name):
                 remove_if_exist(p)
+
 
 def makefile_to_lines(filename: PathLike) -> Iterable[str]:
     lines: List[str] = []
@@ -729,41 +734,6 @@ class NativeMaker:
     def path_RDKit2DotNet_folder(self):
         return self.rdkit_wrapper_path / "RDKit2DotNet"
 
-    def build_cmake_rdkit(self) -> Sequence[str]:
-        self.rdkit_build_path.mkdir(exist_ok=True)
-        _curdir = os.path.abspath(os.curdir)
-        os.chdir(self.rdkit_build_path)
-        try:
-            self._patch_i_files()
-            cmd = self._make_rdkit_cmake()
-            return cmd
-        finally:
-            os.chdir(_curdir)
-
-    def build_rdkit(self) -> None:
-        self.rdkit_build_path.mkdir(exist_ok=True)
-        _curdir = os.path.abspath(os.curdir)
-        os.chdir(self.rdkit_build_path)
-        try:
-            if get_os() == "win":
-                self.run_msbuild("RDKit.sln")
-            else:
-                cmd = ["make", "-j"]
-                if self.config.target_lang in (LangType.CPlusPlus,):
-                    pass
-                elif self.config.target_lang in (LangType.CSharp,):
-                    cmd += ["RDKFuncs"]
-                elif self.config.target_lang in (LangType.Java,):
-                    cmd += ["install"]
-                else:
-                    raise AssertionError
-                call_subprocess(cmd)
-        finally:
-            os.chdir(_curdir)
-
-    def copy_rdkit_dlls(self) -> None:
-        self._copy_dlls()
-
     def _patch_GraphMolCSharp_i(self):
         dic: Dict[str, str] = dict()
         _line = r"%shared_ptr(RDKit::QueryOps)"
@@ -823,10 +793,10 @@ class NativeMaker:
         _line = r"SET(CMAKE_SWIG_OUTDIR ${CMAKE_CURRENT_SOURCE_DIR}/swig_csharp )"
         _inserts = [
             "if(RDK_BUILD_DESCRIPTORS3D)"
-            "SET(CMAKE_SWIG_FLAGS \"-DRDK_BUILD_DESCRIPTORS3D\" \"-DRDK_HAS_EIGEN3\" ${CMAKE_SWIG_FLAGS} )",
+            'SET(CMAKE_SWIG_FLAGS "-DRDK_BUILD_DESCRIPTORS3D" "-DRDK_HAS_EIGEN3" ${CMAKE_SWIG_FLAGS} )',
             "endif()",
             "if(RDK_BUILD_CAIRO_SUPPORT)",
-            "SET(CMAKE_SWIG_FLAGS \"-DRDK_BUILD_CAIRO_SUPPORT\" ${CMAKE_SWIG_FLAGS} )",
+            'SET(CMAKE_SWIG_FLAGS "-DRDK_BUILD_CAIRO_SUPPORT" ${CMAKE_SWIG_FLAGS} )',
             "endif()",
         ]
         _insert = "\n" + "\n".join(_inserts) + "\n"
@@ -908,13 +878,6 @@ class NativeMaker:
             self._patch_MolDescriptors_h()
         self._patch_MolSupplier_i()
         self._patch_Streams_i()
-
-    def _make_rdkit_cmake(self) -> Sequence[str]:
-        cmd: List[str] = self._get_cmake_rdkit_cmd_line()
-        if get_os() == "win":
-            cmd = [a.replace("\\", "/") for a in cmd]
-        call_subprocess(cmd)
-        return cmd
 
     def _get_cmake_rdkit_cmd_line(self) -> List[str]:
         def f_test() -> str:
@@ -1052,16 +1015,44 @@ class NativeMaker:
                 ]
         return ["cmake"] + args
 
-    def get_RDKFuncs_dll_path(self) -> Path:
-        a: Path
-        a = self.rdkit_build_path / "Code" / "JavaWrappers" / "csharp_wrapper"
+    def _make_rdkit_cmake(self) -> Sequence[str]:
+        cmd: List[str] = self._get_cmake_rdkit_cmd_line()
         if get_os() == "win":
-            a = a / "Release" / "RDKFuncs.dll"
-        elif get_os() == "linux":
-            a = a / "RDKFuncs.so"
-        else:
-            raise RuntimeError
-        return a
+            cmd = [a.replace("\\", "/") for a in cmd]
+        call_subprocess(cmd)
+        return cmd
+
+    def build_cmake_rdkit(self) -> Sequence[str]:
+        self.rdkit_build_path.mkdir(exist_ok=True)
+        _curdir = os.path.abspath(os.curdir)
+        os.chdir(self.rdkit_build_path)
+        try:
+            self._patch_i_files()
+            cmd = self._make_rdkit_cmake()
+            return cmd
+        finally:
+            os.chdir(_curdir)
+
+    def build_rdkit(self) -> None:
+        self.rdkit_build_path.mkdir(exist_ok=True)
+        _curdir = os.path.abspath(os.curdir)
+        os.chdir(self.rdkit_build_path)
+        try:
+            if get_os() == "win":
+                self.run_msbuild("RDKit.sln")
+            else:
+                cmd = ["make", "-j"]
+                if self.config.target_lang in (LangType.CPlusPlus,):
+                    pass
+                elif self.config.target_lang in (LangType.CSharp,):
+                    cmd += ["RDKFuncs"]
+                elif self.config.target_lang in (LangType.Java,):
+                    cmd += ["install"]
+                else:
+                    raise AssertionError
+                call_subprocess(cmd)
+        finally:
+            os.chdir(_curdir)
 
     def _copy_dlls(self) -> None:
         assert self.build_platform
@@ -1131,22 +1122,19 @@ class NativeMaker:
         for path in files_to_copy:
             shutil.copy2(path, dll_dest_path)
 
-    def build_wrapper(self) -> None:
-        if self.config.target_lang == LangType.CSharp:
-            self._patch_rdkit_swig_created_files()
-            self._prepare_RDKitDotNet_folder()
-            self._copy_test_projects()
-            self._build_RDKit2DotNet()
-        elif self.config.target_lang == LangType.Java:
-            _curdir = os.path.abspath(os.curdir)
-            os.chdir(self.rdkit_build_path)
-            try:
-                cmd = ["make", "-j", "GraphMolWrapJar"]
-                call_subprocess(cmd)
-            finally:
-                os.chdir(_curdir)
+    def copy_rdkit_dlls(self) -> None:
+        self._copy_dlls()
+
+    def get_RDKFuncs_dll_path(self) -> Path:
+        a: Path
+        a = self.rdkit_build_path / "Code" / "JavaWrappers" / "csharp_wrapper"
+        if get_os() == "win":
+            a = a / "Release" / "RDKFuncs.dll"
+        elif get_os() == "linux":
+            a = a / "RDKFuncs.so"
         else:
-            pass
+            raise RuntimeError
+        return a
 
     def _patch_rdkit_swig_created_files(self) -> None:
         # Customize the followings if required.
@@ -1243,22 +1231,6 @@ class NativeMaker:
                 copy_to_output_directory.text = "PreserveNewest"
         tree.write(path_RDKit2DotNet_csproj, "utf-8", True)
 
-    @property
-    def test_csprojects(self) -> Collection[str]:
-        return (
-            "RDKit2DotNetTest",
-            "RDKit2DotNetTest2",
-            "NuGetExample",
-            "NuGetExample2",
-        )
-
-    @property
-    def test_sln_names(self) -> Collection[str]:
-        return (
-            "RDKit2DotNet.sln",
-            "NuGetExample.sln",
-        )
-
     def _copy_test_projects(self) -> None:
         path_rdkit_files = self.this_path / "files" / "rdkit"
         for name in self.test_csprojects:
@@ -1298,11 +1270,38 @@ class NativeMaker:
         finally:
             os.chdir(_pushd_build_wrapper)
 
-    def build_nuget_package(self) -> None:
-        dll_basenames_dic = self._make_dll_basenames_dic()
-        self._prepare_nuspec_file(dll_basenames_dic)
-        self._prepare_targets_file(dll_basenames_dic)
-        self._build_nupkg()
+    def build_wrapper(self) -> None:
+        if self.config.target_lang == LangType.CSharp:
+            self._patch_rdkit_swig_created_files()
+            self._prepare_RDKitDotNet_folder()
+            self._copy_test_projects()
+            self._build_RDKit2DotNet()
+        elif self.config.target_lang == LangType.Java:
+            _curdir = os.path.abspath(os.curdir)
+            os.chdir(self.rdkit_build_path)
+            try:
+                cmd = ["make", "-j", "GraphMolWrapJar"]
+                call_subprocess(cmd)
+            finally:
+                os.chdir(_curdir)
+        else:
+            pass
+
+    @property
+    def test_csprojects(self) -> Collection[str]:
+        return (
+            "RDKit2DotNetTest",
+            "RDKit2DotNetTest2",
+            "NuGetExample",
+            "NuGetExample2",
+        )
+
+    @property
+    def test_sln_names(self) -> Collection[str]:
+        return (
+            "RDKit2DotNet.sln",
+            "NuGetExample.sln",
+        )
 
     def _make_dll_basenames_dic(self) -> Mapping[str, Mapping[str, Sequence[str]]]:
         dll_basenames_dic: Dict[str, Dict[str, List[str]]] = dict()
@@ -1322,6 +1321,102 @@ class NativeMaker:
             assert dll_basenames_dic["linux"]["x64"]
             assert not dll_basenames_dic["linux"]["x86"]
         return dll_basenames_dic
+
+    def _prepare_nuspec_file(
+        self, dll_basenames_dic: Mapping[str, Mapping[str, Sequence[str]]]
+    ) -> None:
+        origin_file = self.this_path / "files" / "rdkit" / f"{project_name}.nuspec"
+        nuspec_file = shutil.copy2(origin_file, self.rdkit_wrapper_path / "RDKit2DotNet")
+
+        tree: ElementTree = load_nuspec_xml(nuspec_file)
+        root = tree.getroot()
+        ns = "http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"
+
+        metadata = get_elem(root, "metadata", ns)
+        description = get_elem(metadata, "description", ns)
+        description.text = self.get_description_for_nuget()
+        version = get_elem(metadata, "version", ns)
+        version.text = self.get_version_for_nuget()
+        releaseNotes = get_elem(metadata, "releaseNotes", ns)
+        releaseNotes.text = self.get_releaseNotes()
+
+        files = get_elem(root, "files", ns)
+        for _os in typing.get_args(SupportedSystem):
+            for cpu_model in typing.get_args(CpuModel):
+                for dll_basename in dll_basenames_dic[_os][cpu_model]:
+                    file_element = SubElement(files, "file")
+                    file_element.attrib["src"] = f"../{_os}/{cpu_model}/{dll_basename}"
+                    file_element.attrib["target"] = (
+                        f"runtimes/{_os}-{cpu_model}/native/{dll_basename}"
+                    )
+
+        tree.write(nuspec_file, "utf-8", True)
+
+    def _prepare_targets_file(
+        self, dll_basenames_dic: Mapping[str, Mapping[str, Sequence[str]]]
+    ) -> None:
+        origin_file = self.this_path / "files" / "rdkit" / f"{project_name}.targets"
+        targets_file = shutil.copy2(origin_file, self.rdkit_wrapper_path / "RDKit2DotNet")
+
+        tree: ElementTree = load_msbuild_xml(targets_file)
+        project = tree.getroot()
+
+        non_net = (
+            "!$(TargetFramework.Contains('netstandard')) "
+            "And !$(TargetFramework.Contains('netcoreapp')) "
+            "And !$(TargetFramework.Contains('net5.'))"
+            "And !$(TargetFramework.Contains('net6.'))"
+        )
+        _os = "win"
+        ig: Element
+        for cpu_model in typing.get_args(CpuModel):
+            ig = SubElement(project, "ItemGroup")
+            ig.attrib["Condition"] = f"{non_net} And '$(Platform)' == '{cpu_model}'"
+            for dllname in dll_basenames_dic[_os][cpu_model]:
+                none = SubElement(ig, "None")
+                none.attrib["Include"] = (
+                    f"$(MSBuildThisFileDirectory)../runtimes/{_os}-{cpu_model}/native/{dllname}"
+                )
+                link = SubElement(none, "Link")
+                link.text = dllname
+                copy_to = SubElement(none, "CopyToOutputDirectory")
+                copy_to.text = "PreserveNewest"
+        ig = SubElement(project, "ItemGroup")
+        ig.attrib["Condition"] = f"{non_net} And '$(Platform)' == 'AnyCPU'"
+        _os = "win"
+        for cpu_model in typing.get_args(CpuModel):
+            for dllname in dll_basenames_dic[_os][cpu_model]:
+                none = SubElement(ig, "None")
+                none.attrib["Include"] = (
+                    f"$(MSBuildThisFileDirectory)../runtimes/{_os}-{cpu_model}/native/{dllname}"
+                )
+                link = SubElement(none, "Link")
+                link.text = f"runtimes/{_os}-{cpu_model}/native/{dllname}"
+                copy_to = SubElement(none, "CopyToOutputDirectory")
+                copy_to.text = "PreserveNewest"
+
+        tree.write(targets_file, "utf-8", True)
+
+    def _build_nupkg(self) -> None:
+        _curr_dir = os.curdir
+        os.chdir(self.rdkit_wrapper_path / "RDKit2DotNet")
+        try:
+            cmd = [
+                "dotnet",
+                "pack",
+                "RDKit2DotNet.csproj",
+                f"-p:NuspecFile={project_name}.nuspec",
+                "/p:Configuration=Release",
+            ]
+            call_subprocess(cmd)
+        finally:
+            os.chdir(_curr_dir)
+
+    def build_nuget_package(self) -> None:
+        dll_basenames_dic = self._make_dll_basenames_dic()
+        self._prepare_nuspec_file(dll_basenames_dic)
+        self._prepare_targets_file(dll_basenames_dic)
+        self._build_nupkg()
 
     def get_description_for_nuget(self) -> str:
         s = f".NET binding of RDKit Release_{self.get_version_for_rdkit()}."
@@ -1356,96 +1451,6 @@ class NativeMaker:
             s += " for Windows build"
         s += "."
         return s
-
-    def _prepare_nuspec_file(
-        self, dll_basenames_dic: Mapping[str, Mapping[str, Sequence[str]]]
-    ) -> None:
-        origin_file = self.this_path / "files" / "rdkit" / f"{project_name}.nuspec"
-        nuspec_file = shutil.copy2(origin_file, self.rdkit_wrapper_path / "RDKit2DotNet")
-
-        tree: ElementTree = load_nuspec_xml(nuspec_file)
-        root = tree.getroot()
-        ns = "http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"
-
-        metadata = get_elem(root, "metadata", ns)
-        description = get_elem(metadata, "description", ns)
-        description.text = self.get_description_for_nuget()
-        version = get_elem(metadata, "version", ns)
-        version.text = self.get_version_for_nuget()
-        releaseNotes = get_elem(metadata, "releaseNotes", ns)
-        releaseNotes.text = self.get_releaseNotes()
-
-        files = get_elem(root, "files", ns)
-        for _os in typing.get_args(SupportedSystem):
-            for cpu_model in typing.get_args(CpuModel):
-                for dll_basename in dll_basenames_dic[_os][cpu_model]:
-                    file_element = SubElement(files, "file")
-                    file_element.attrib["src"] = f"../{_os}/{cpu_model}/{dll_basename}"
-                    file_element.attrib[
-                        "target"
-                    ] = f"runtimes/{_os}-{cpu_model}/native/{dll_basename}"
-
-        tree.write(nuspec_file, "utf-8", True)
-
-    def _prepare_targets_file(
-        self, dll_basenames_dic: Mapping[str, Mapping[str, Sequence[str]]]
-    ) -> None:
-        origin_file = self.this_path / "files" / "rdkit" / f"{project_name}.targets"
-        targets_file = shutil.copy2(origin_file, self.rdkit_wrapper_path / "RDKit2DotNet")
-
-        tree: ElementTree = load_msbuild_xml(targets_file)
-        project = tree.getroot()
-
-        non_net = (
-            "!$(TargetFramework.Contains('netstandard')) "
-            "And !$(TargetFramework.Contains('netcoreapp')) "
-            "And !$(TargetFramework.Contains('net5.'))"
-            "And !$(TargetFramework.Contains('net6.'))"
-        )
-        _os = "win"
-        ig: Element
-        for cpu_model in typing.get_args(CpuModel):
-            ig = SubElement(project, "ItemGroup")
-            ig.attrib["Condition"] = f"{non_net} And '$(Platform)' == '{cpu_model}'"
-            for dllname in dll_basenames_dic[_os][cpu_model]:
-                none = SubElement(ig, "None")
-                none.attrib[
-                    "Include"
-                ] = f"$(MSBuildThisFileDirectory)../runtimes/{_os}-{cpu_model}/native/{dllname}"
-                link = SubElement(none, "Link")
-                link.text = dllname
-                copy_to = SubElement(none, "CopyToOutputDirectory")
-                copy_to.text = "PreserveNewest"
-        ig = SubElement(project, "ItemGroup")
-        ig.attrib["Condition"] = f"{non_net} And '$(Platform)' == 'AnyCPU'"
-        _os = "win"
-        for cpu_model in typing.get_args(CpuModel):
-            for dllname in dll_basenames_dic[_os][cpu_model]:
-                none = SubElement(ig, "None")
-                none.attrib[
-                    "Include"
-                ] = f"$(MSBuildThisFileDirectory)../runtimes/{_os}-{cpu_model}/native/{dllname}"
-                link = SubElement(none, "Link")
-                link.text = f"runtimes/{_os}-{cpu_model}/native/{dllname}"
-                copy_to = SubElement(none, "CopyToOutputDirectory")
-                copy_to.text = "PreserveNewest"
-
-        tree.write(targets_file, "utf-8", True)
-
-    def _build_nupkg(self) -> None:
-        _curr_dir = os.curdir
-        os.chdir(self.rdkit_wrapper_path / "RDKit2DotNet")
-        try:
-            cmd = [
-                "dotnet",
-                "pack",
-                "RDKit2DotNet.csproj",
-                f"-p:NuspecFile={project_name}.nuspec",
-                "/p:Configuration=Release",
-            ]
-            call_subprocess(cmd)
-        finally:
-            os.chdir(_curr_dir)
 
     def clean_zlib(self) -> None:
         if self.config.zlib_path:
@@ -1496,11 +1501,18 @@ class NativeMaker:
                 dir = self.rdkit_path / "Code" / "JavaWrappers" / "gmwrapper" / name
                 remove_if_exist(dir)
             for name in ("src", "src-test"):
-                dir = self.rdkit_path / "Code" / "JavaWrappers" / "gmwrapper" / name / "org" / "RDKit"
+                dir = (
+                    self.rdkit_path
+                    / "Code"
+                    / "JavaWrappers"
+                    / "gmwrapper"
+                    / name
+                    / "org"
+                    / "RDKit"
+                )
                 remove_by_pattern(dir, "\\.gitignore", delete_on_match=False)
             dir = self.rdkit_path / "Code" / "JavaWrappers" / "gmwrapper"
             remove_by_pattern(dir, ".*\\.jar$", delete_on_match=True)
-
 
     def clean(self) -> None:
         self.clean_rdkit()
@@ -1531,14 +1543,62 @@ def config_file_to_map(path: Path) -> Mapping[str, str]:
     return dic
 
 
+def create_config(args: argparse.Namespace, config_info: Mapping[str, str]) -> Config:
+    def get_value(env: str) -> Optional[str]:
+        value: Optional[str]
+        if env in config_info:
+            value = config_info[env]
+        else:
+            value = get_value_from_env(env)
+        return value
+
+    def path_from_ini(env: str) -> Optional[Path]:
+        value: Optional[str] = get_value(env)
+        if value is None:
+            return None
+        path = Path(value)
+        if not path.is_absolute():
+            path = here / value
+        return path
+
+    def int_from_int(env: str, default: int) -> int:
+        value: Optional[str] = get_value(env)
+        if value is None:
+            return default
+        return int(value)
+
+    config = Config()
+    config.minor_version = int_from_int("MINOR_VERSION", 1)
+    config.swig_patch_enabled = not args.disable_swig_patch
+    config.use_boost = args.use_boost
+    config.cairo_support = not args.no_cairo
+    config.freetype_support = not args.no_freetype
+    config.limit_external = args.limit_external
+    if config.limit_external:
+        config.cairo_support = False
+        config.freetype_support = False
+    config.this_path = here
+    config.use_static_libs = args.use_static_libs
+    config.rdkit_path = path_from_ini("RDKIT_DIR")
+    if get_os() == "win":
+        # These pathes are only for Windows.
+        config.boost_path = path_from_ini("BOOST_DIR")
+        config.zlib_path = path_from_ini("ZLIB_DIR")
+        config.libpng_path = path_from_ini("LIBPNG_DIR")
+        config.pixman_path = path_from_ini("PIXMAN_DIR")
+        config.freetype_path = path_from_ini("FREETYPE_DIR")
+        config.cairo_path = path_from_ini("CAIRO_DIR")
+    config.eigen_path = path_from_ini("EIGEN_DIR")
+    config.test_enabled = False
+    return config
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--build_platform", default="all", choices=list(typing.get_args(CpuModel)) + ["all"]
     )
-    parser.add_argument(
-        "--target_lang", default="csharp", choices=("csharp", "java", "cpp")
-    )
+    parser.add_argument("--target_lang", default="csharp", choices=("csharp", "java", "cpp"))
     for opt in (
         "build_zlib",
         "build_libpng",
@@ -1629,56 +1689,6 @@ def main() -> None:
             maker.build_nuget_package()
     finally:
         os.chdir(curr_dir)
-
-
-def create_config(args: argparse.Namespace, config_info: Mapping[str, str]) -> Config:
-    def get_value(env: str) -> Optional[str]:
-        value: Optional[str]
-        if env in config_info:
-            value = config_info[env]
-        else:
-            value = get_value_from_env(env)
-        return value
-
-    def path_from_ini(env: str) -> Optional[Path]:
-        value: Optional[str] = get_value(env)
-        if value is None:
-            return None
-        path = Path(value)
-        if not path.is_absolute():
-            path = here / value
-        return path
-
-    def int_from_int(env: str, default: int) -> int:
-        value: Optional[str] = get_value(env)
-        if value is None:
-            return default
-        return int(value)
-
-    config = Config()
-    config.minor_version = int_from_int("MINOR_VERSION", 1)
-    config.swig_patch_enabled = not args.disable_swig_patch
-    config.use_boost = args.use_boost
-    config.cairo_support = not args.no_cairo
-    config.freetype_support = not args.no_freetype
-    config.limit_external = args.limit_external
-    if config.limit_external:
-        config.cairo_support = False
-        config.freetype_support = False
-    config.this_path = here
-    config.use_static_libs = args.use_static_libs
-    config.rdkit_path = path_from_ini("RDKIT_DIR")
-    if get_os() == "win":
-        # These pathes are only for Windows.
-        config.boost_path = path_from_ini("BOOST_DIR")
-        config.zlib_path = path_from_ini("ZLIB_DIR")
-        config.libpng_path = path_from_ini("LIBPNG_DIR")
-        config.pixman_path = path_from_ini("PIXMAN_DIR")
-        config.freetype_path = path_from_ini("FREETYPE_DIR")
-        config.cairo_path = path_from_ini("CAIRO_DIR")
-    config.eigen_path = path_from_ini("EIGEN_DIR")
-    config.test_enabled = False
-    return config
 
 
 if __name__ == "__main__":
