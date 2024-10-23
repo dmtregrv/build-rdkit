@@ -38,7 +38,7 @@ from xml.etree.ElementTree import Element, ElementTree, SubElement
 logging.basicConfig(level=logging.DEBUG)
 project_name: str = "RDKit.DotNetWrap"
 
-VisualStudioVersion = Literal["15.0", "16.0"]
+VisualStudioVersion = Literal["15.0", "16.0", "17.0"]
 CpuModel = Literal["x86", "x64"]
 MSPlatform = Literal["Win32", "x64"]
 AddressModel = Literal[32, 64]
@@ -75,6 +75,10 @@ _vs_ver_to_cmake_option_catalog: Mapping[VisualStudioVersion, Mapping[CpuModel, 
         "x86": ['-G"Visual Studio 16 2019"', "-AWin32"],
         "x64": ['-G"Visual Studio 16 2019"'],
     },
+    "17.0": {
+        "x86": ['-G"Visual Studio 17 2022"', "-AWin32"],
+        "x64": ['-G"Visual Studio 17 2022"'],
+    },
 }
 _platform_to_ms_form: Mapping[CpuModel, MSPlatform] = {
     "x86": "Win32",
@@ -87,6 +91,7 @@ _platform_to_address_model: Mapping[CpuModel, AddressModel] = {
 _vs_to_msvc_internal_ver: Mapping[VisualStudioVersion, MSVCInternalVersion] = {
     "15.0": "14.1",
     "16.0": "14.2",
+    "17.0": "14.3"
 }
 
 
