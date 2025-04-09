@@ -4,9 +4,9 @@ if [ "$?" != "0" ] ; then
     exit 1
 fi
 
-python --version | grep -E "Python 3\.(8|9|10)\." > /dev/null
+python --version | grep -E "Python 3\.(8|9|10|11|12)\." > /dev/null
 if [ "$?" != "0" ] ; then
-    echo Python version is 3.8, 3.9, or 3.10.
+    echo Python version is lower than 3.8.
     exit 1
 fi
 

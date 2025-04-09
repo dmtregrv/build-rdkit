@@ -918,7 +918,7 @@ class NativeMaker:
         if self.config.boost_path:
             args += [
                 f"-DBOOST_ROOT={str(self.boost_path)}",
-                f"-DBOOST_INCLUDEDIR={str(self.boost_path)}",
+                f"-DBoost_INCLUDE_DIR={str(self.boost_path)}",
                 f"-DBOOST_LIBRARYDIR={str(self.boost_bin_path)}",
             ]
         if self.config.eigen_path:
